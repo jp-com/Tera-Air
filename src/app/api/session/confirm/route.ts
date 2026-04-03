@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { sendCommand } from "@/lib/device-simulator";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
 
   const { data: session, error: fetchError } = await supabase
     .from("sessions")
-    .select("id, status, duration_minutes")
+    .select("id, status, duration_minutes, cart_id")
     .eq("id", session_id)
     .single();
 
@@ -49,6 +50,20 @@ export async function POST(request: Request) {
       { error: "Failed to confirm session" },
       { status: 500 }
     );
+  }
+
+  // Send activate command to the device
+  const { data: cart } = await supabase
+    .from("carts")
+    .select("device_id")
+    .eq("id", session.cart_id)
+    .single();
+
+  if (cart?.device_id) {
+    await sendCommand(cart.device_id, "activate", {
+      session_id: updated.id,
+      duration_minutes: session.duration_minutes,
+    });
   }
 
   return Response.json({

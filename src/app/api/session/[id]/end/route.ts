@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { sendCommand } from "@/lib/device-simulator";
 
 export async function POST(
   _request: Request,
@@ -8,7 +9,7 @@ export async function POST(
 
   const { data: session, error: fetchError } = await supabase
     .from("sessions")
-    .select("id, status")
+    .select("id, status, cart_id")
     .eq("id", id)
     .single();
 
@@ -38,6 +39,20 @@ export async function POST(
       { error: "Failed to end session" },
       { status: 500 }
     );
+  }
+
+  // Send deactivate command to the device
+  const { data: cart } = await supabase
+    .from("carts")
+    .select("device_id")
+    .eq("id", session.cart_id)
+    .single();
+
+  if (cart?.device_id) {
+    await sendCommand(cart.device_id, "deactivate", {
+      session_id: updated.id,
+      reason: "manual_end",
+    });
   }
 
   return Response.json({
